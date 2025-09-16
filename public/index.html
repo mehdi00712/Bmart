@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Local Marketplace</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<header class="nav">
+  <div class="logo">LocalMart</div>
+  <nav>
+    <input id="q" placeholder="Search products..." />
+    <a href="/cart.html">Cart (<span id="cartCount">0</span>)</a>
+  </nav>
+</header>
+
+<main class="container">
+  <h1>Featured Products</h1>
+  <div id="grid" class="grid"></div>
+</main>
+
+<script type="module">
+  import { db, collection, registerFcmToken } from './js/firebase.js';
+  import { $, fmtCurrency } from './js/util.js';
+  import { getCart } from './js/store.js';
+  import { getDocs } from './js/firebase.js';
+
+  // Show cart count
+  const count = getCart().reduce((n, it) => n + it.qty, 0);
+  document.getElementById('cartCount').textContent = count;
+
+  registerFcmToken();
+
+  const grid = document.getElementById('grid');
+  const qInput = document.getElementById('q');
+
+  async function loadProducts(term = '') {
+    // Simple client-side filter
+    const snap = await getDocs(collection(db, 'products'));
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.isActive !== false);
+    const filtered = term ? items.filter(p => (p.title||'').toLowerCase().includes(term.toLowerCase())) : items;
+    grid.innerHTML = filtered.map(p => `
+      <a class="card" href="/product.html?id=${p.id}">
+        <img src="${(p.images&&p.images[0])||'https://via.placeholder.com/600x400?text=Product'}" alt="${p.title}">
+        <div class="p-2">
+          <h3>${p.title}</h3>
+          <p>${fmtCurrency(p.price)}</p>
+        </div>
+      </a>
+    `).join('');
+  }
+
+  qInput.addEventListener('input', e => loadProducts(e.target.value));
+  loadProducts();
+</script>
+</body>
+</html>

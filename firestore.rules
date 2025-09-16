@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+    function userRole() {
+      return signedIn() ?
+        get(/databases/$(db)/documents/users/$(request.auth.uid)).data.role : null;
+    }
+    function isSeller() { return userRole() == 'seller' || userRole() == 'admin'; }
+    function isAdmin() { return userRole() == 'admin'; }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow write: if isSelf(uid) || isAdmin();
+    }
+
+    match /shops/{shopId} {
+      allow read: if true;
+      allow create: if isSeller() && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if isSeller() && resource.data.ownerUid == request.auth.uid || isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isSeller() && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if isSeller() && resource.data.ownerUid == request.auth.uid || isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow create: if signedIn(); // Checkout signs in anonymously if needed
+      allow read: if signedIn() && (
+        request.auth.uid == resource.data.buyerUid ||
+        request.auth.uid == resource.data.sellerUid ||
+        isAdmin()
+      );
+      allow update: if signedIn() && (
+        request.auth.uid == resource.data.sellerUid || isAdmin()
+      );
+    }
+  }
+}
