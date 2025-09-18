@@ -7,10 +7,16 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+
 <header class="nav">
-  <div class="logo">Bmart — Seller</div>
-  <nav>
-    <a id="signout" href="#">Sign out</a>
+  <div class="logo"><a href="index.html" style="color:white;text-decoration:none">Bmart — Seller</a></div>
+  <nav style="display:flex;gap:12px;align-items:center">
+    <a href="index.html">Home</a>
+    <a href="cart.html">Cart</a>
+    <a href="checkout.html">Checkout</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="admin.html">Admin</a>
+    <a id="signout" href="#" style="background:#ef4444">Sign out</a>
   </nav>
 </header>
 
@@ -49,10 +55,7 @@
     await signOut(auth);
     location.href = 'login.html';
   };
-
-  onAuthStateChanged(auth, (u) => {
-    if (!u) location.href = 'login.html';
-  });
+  onAuthStateChanged(auth, (u) => { if (!u) location.href = 'login.html'; });
 </script>
 <script type="module" src="seller.js"></script>
 </body>
