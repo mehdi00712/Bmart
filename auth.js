@@ -4,12 +4,9 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-import {
-  doc, getDoc, setDoc, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 const form = document.getElementById('authForm');
-const loginBtn = document.getElementById('loginBtn');
 const signupBtn = document.getElementById('signupBtn');
 const msg = document.getElementById('msg');
 
@@ -22,9 +19,7 @@ function getForm() {
 async function ensureUserDoc(uid, defaults) {
   const ref = doc(db, 'users', uid);
   const snap = await getDoc(ref);
-  if (!snap.exists()) {
-    await setDoc(ref, { createdAt: serverTimestamp(), ...defaults });
-  }
+  if (!snap.exists()) await setDoc(ref, { createdAt: serverTimestamp(), ...defaults });
 }
 
 form.addEventListener('submit', async (e)=>{
