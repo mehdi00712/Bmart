@@ -34,7 +34,7 @@
     document.getElementById('add').onclick = () => {
       const qty = Number(document.getElementById('qty').value || '1');
       addToCart({
-        productId: id, title: p.title, price: Number(p.price||0), qty,
+        productId: id, title: p.title, price: Number(p.price || 0), qty,
         sellerUid: p.ownerUid, shopId: p.shopId
       });
       alert('Added to cart');
@@ -44,4 +44,3 @@
 </script>
 </body>
 </html>
-
