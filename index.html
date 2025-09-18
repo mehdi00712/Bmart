@@ -12,6 +12,7 @@
   <nav>
     <input id="q" placeholder="Search products..." />
     <a href="cart.html">Cart (<span id="cartCount">0</span>)</a>
+    <a href="login.html" style="margin-left:12px">Seller</a>
   </nav>
 </header>
 
@@ -27,7 +28,8 @@
 
   document.getElementById('cartCount').textContent =
     getCart().reduce((n, it) => n + it.qty, 0);
-  registerFcmToken();
+
+  registerFcmToken(); // safe even if no VAPID yet
 
   const grid = document.getElementById('grid');
   const qInput = document.getElementById('q');
@@ -38,14 +40,16 @@
     const filtered = term
       ? items.filter(p => (p.title || '').toLowerCase().includes(term.toLowerCase()))
       : items;
+
     grid.innerHTML = filtered.map(p => `
       <a class="card" href="product.html?id=${p.id}">
-        <img src="${(p.images && p.images[0]) || 'https://via.placeholder.com/600x400?text=Product'}">
+        <img src="${(p.images && p.images[0]) || 'https://via.placeholder.com/600x400?text=Product'}" alt="${p.title}">
         <div class="p-2">
           <h3>${p.title}</h3>
           <p>${fmtCurrency(p.price)}</p>
         </div>
-      </a>`).join('');
+      </a>
+    `).join('');
   }
 
   qInput.addEventListener('input', e => loadProducts(e.target.value));
