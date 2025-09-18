@@ -7,17 +7,25 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+
 <header class="nav">
-  <div class="logo">Bmart</div>
-  <nav>
-    <input id="q" placeholder="Search products..." />
-    <a href="cart.html">Cart (<span id="cartCount">0</span>)</a>
-    <a href="login.html" style="margin-left:12px">Seller</a>
+  <div class="logo"><a href="index.html" style="color:white;text-decoration:none">Bmart</a></div>
+  <nav style="display:flex;gap:12px;align-items:center">
+    <a href="index.html">Home</a>
+    <a href="cart.html">Cart</a>
+    <a href="checkout.html">Checkout</a>
+    <a href="login.html">Seller Login</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="admin.html">Admin</a>
   </nav>
 </header>
 
 <main class="container">
   <h1>Featured Products</h1>
+  <div class="row" style="border:none;padding:0">
+    <input id="q" placeholder="Search products..." style="max-width:360px">
+    <div>Cart (<span id="cartCount">0</span>)</div>
+  </div>
   <div id="grid" class="grid"></div>
 </main>
 
@@ -29,7 +37,7 @@
   document.getElementById('cartCount').textContent =
     getCart().reduce((n, it) => n + it.qty, 0);
 
-  registerFcmToken(); // safe even if no VAPID yet
+  registerFcmToken(); // optional
 
   const grid = document.getElementById('grid');
   const qInput = document.getElementById('q');
