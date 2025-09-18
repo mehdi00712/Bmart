@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checkout</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main class="container">
+  <h1>Checkout</h1>
+  <div id="summary"></div>
+  <form id="form" class="card">
+    <label>Name <input required name="name"></label>
+    <label>Phone <input required name="phone"></label>
+    <label>Address <textarea name="address" placeholder="If delivery/postage"></textarea></label>
+
+    <fieldset>
+      <legend>Delivery Method</legend>
+      <label><input type="radio" name="dm" value="pickup" checked> Pick up (Rs 0)</label>
+      <label><input type="radio" name="dm" value="delivery"> Delivery (Rs 150)</label>
+      <label><input type="radio" name="dm" value="postage"> Postage (Rs 125)</label>
+    </fieldset>
+
+    <p id="total"></p>
+    <button type="submit">Place Order</button>
+  </form>
+</main>
+<script type="module" src="checkout.js"></script>
+</body>
+</html>
