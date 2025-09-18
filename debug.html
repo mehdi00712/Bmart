@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Debug</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="container">
+  <h1>Debug</h1>
+  <div id="out" class="card" style="padding:12px;white-space:pre-wrap"></div>
+</main>
+<script type="module">
+  import { auth, db, ensureAuth, collection, getDocs, query, where } from './firebase.js';
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
+  const out = document.getElementById('out');
+  function log(...a){ out.textContent += a.join(' ') + "\n"; }
+
+  onAuthStateChanged(auth, async (u)=>{
+    if (!u) {
+      await ensureAuth();
+    }
+    const user = auth.currentUser;
+    log('Current UID:', user?.uid || '(none)');
+    try {
+      // List a few products
+      const pSnap = await getDocs(collection(db, 'products'));
+      log('\\nProducts:');
+      pSnap.docs.slice(0,10).forEach(d => {
+        const p = d.data();
+        log(`- ${d.id} | title=${p.title} | ownerUid=${p.ownerUid} | shopId=${p.shopId}`);
+      });
+
+      // Try to read orders for this UID
+      const oQ = query(collection(db, 'orders'), where('sellerUid','==', user.uid));
+      const oSnap = await getDocs(oQ);
+      log('\\nOrders for your UID:');
+      if (oSnap.empty) log('(none)');
+      oSnap.docs.forEach(d => {
+        const o = d.data();
+        log(`- ${d.id} | total=${o.total} | status=${o.status}`);
+      });
+    } catch (e) {
+      log('\\nERROR:', e.message || e);
+    }
+  });
+</script>
+</body></html>
