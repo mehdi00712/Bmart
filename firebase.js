@@ -31,6 +31,7 @@ export async function ensureAuth() {
   });
 }
 
+// Optional web push (requires VAPID)
 export async function registerFcmToken() {
   try {
     const current = auth.currentUser || (await ensureAuth());
