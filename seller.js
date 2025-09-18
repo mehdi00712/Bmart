@@ -107,10 +107,11 @@ async function loadProducts() {
 }
 loadProducts();
 
+// Live Incoming Orders with buyer details + Delete button
 onSnapshot(
   query(collection(db, 'orders'), where('sellerUid', '==', user.uid)),
   (snap) => {
-    const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const orders = snap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
     ordersDiv.innerHTML = orders.map(o => {
       const when = o.createdAt?.toDate ? o.createdAt.toDate().toLocaleString() : '';
       const buyerLine = `
@@ -128,18 +129,31 @@ onSnapshot(
           ${buyerLine}
           ${o.items.map(i => `${i.title} × ${i.qty}`).join(', ')}<br>
           Total: ${fmtCurrency(o.total)}<br>
-          <select data-id="${o.id}" class="status" style="margin-top:8px">
-            ${['pending','accepted','out_for_delivery','completed','cancelled']
-              .map(s => `<option ${s===o.status?'selected':''}>${s}</option>`).join('')}
-          </select>
+
+          <div class="row" style="border:none;padding:8px 0 0 0">
+            <select data-id="${o.id}" class="status">
+              ${['pending','accepted','out_for_delivery','completed','cancelled']
+                .map(s => `<option ${s===o.status?'selected':''}>${s}</option>`).join('')}
+            </select>
+            <button class="del-order" data-id="${o.id}" style="background:#ef4444">Delete</button>
+          </div>
         </div>
       `;
     }).join('');
 
+    // status change
     $$('.status', ordersDiv).forEach(sel => sel.onchange = async () => {
       try {
         await updateDoc(doc(db, 'orders', sel.dataset.id), { status: sel.value });
-      } catch (e4) { alert(e4.message || 'Status update failed'); }
+      } catch (e) { alert(e.message || 'Status update failed'); }
+    });
+
+    // delete order
+    $$('.del-order', ordersDiv).forEach(btn => btn.onclick = async () => {
+      if (!confirm('Delete this order? This will NOT restore product stock.')) return;
+      try {
+        await deleteDoc(doc(db, 'orders', btn.dataset.id));
+      } catch (e) { alert(e.message || 'Delete failed'); }
     });
   }
 );
