@@ -35,7 +35,7 @@ form.addEventListener('submit', async (e) => {
   if (!items.length) return alert('Cart is empty');
   const { st, fee, total } = calcTotal(method);
 
-  // Read fields via FormData (avoid form.name collision)
+  // Read fields via FomData (avoid form.name collision)
   const fd = new FormData(form);
   const buyerName = (fd.get('name') || '').toString().trim();
   const buyerPhone = (fd.get('phone') || '').toString().trim();
