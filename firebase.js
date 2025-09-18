@@ -1,8 +1,10 @@
+// Firebase init (flat for GitHub Pages)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-messaging.js";
 
+// Your config
 export const firebaseConfig = {
   apiKey: "AIzaSyBMqutrvlRPiDYwqn2JSutL38rsCyiaeJ8",
   authDomain: "marketplace-ddddc.firebaseapp.com",
@@ -28,7 +30,7 @@ export async function ensureAuth() {
   });
 }
 
-// Optional: Web Push (if you add VAPID in Firebase)
+// Optional web push (requires VAPID in Firebase project settings)
 export async function registerFcmToken() {
   try {
     const current = auth.currentUser || (await ensureAuth());
@@ -48,6 +50,7 @@ export async function registerFcmToken() {
   }
 }
 
+// re-exports
 export {
   collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
   query, where, orderBy, onSnapshot, serverTimestamp
