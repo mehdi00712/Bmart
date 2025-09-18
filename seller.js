@@ -1,9 +1,12 @@
-import { db, ensureAuth, doc, setDoc, addDoc, updateDoc, getDoc, getDocs, collection, query, where, onSnapshot, serverTimestamp } from './firebase.js';
+import {
+  db, ensureAuth, doc, setDoc, addDoc, updateDoc, deleteDoc, getDoc, getDocs,
+  collection, query, where, onSnapshot, serverTimestamp
+} from './firebase.js';
 import { $, $$, fmtCurrency } from './util.js';
 
 // Cloudinary unsigned upload
 const CLOUD_NAME = 'degcslkrj';
-const UPLOAD_PRESET = 'marketplace'; // your unsigned preset name
+const UPLOAD_PRESET = 'marketplace';
 const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
 
 async function uploadImage(file) {
@@ -31,12 +34,11 @@ imgInput?.addEventListener('change', async () => {
 });
 
 const user = await ensureAuth();
-// Ensure user doc exists & role
 const userRef = doc(db, 'users', user.uid);
 const uSnap = await getDoc(userRef);
 if (!uSnap.exists()) await setDoc(userRef, { role: 'seller', createdAt: serverTimestamp() });
 
-// Save product
+// Save / update product
 pform.addEventListener('submit', async (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(pform).entries());
@@ -48,16 +50,13 @@ pform.addEventListener('submit', async (e) => {
     description: data.description||'',
     images: imageUrl ? [imageUrl] : [],
     ownerUid: user.uid,
-    shopId: user.uid, // one shop per seller (MVP)
+    shopId: user.uid,
     isActive: true,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
-  if (data.id) {
-    await updateDoc(doc(db, 'products', data.id), prod);
-  } else {
-    await addDoc(collection(db, 'products'), prod);
-  }
+  if (data.id) await updateDoc(doc(db, 'products', data.id), prod);
+  else await addDoc(collection(db, 'products'), prod);
   alert('Saved');
   pform.reset(); imageUrl='';
   loadProducts();
@@ -70,9 +69,18 @@ async function loadProducts() {
     <div class="row">
       <div><img class="thumb" src="${(p.images&&p.images[0])||''}"></div>
       <div><b>${p.title}</b><br>${fmtCurrency(p.price)} · Stock: ${p.stock}</div>
-      <div><button data-id="${p.id}" class="edit">Edit</button></div>
+      <div>
+        <button data-id="${p.id}" class="edit">Edit</button>
+        <button data-id="${p.id}" class="del" style="background:#ef4444">Delete</button>
+      </div>
     </div>`).join('');
+
   $$('.edit', plist).forEach(btn => btn.onclick = () => fillForm(items.find(i => i.id === btn.dataset.id)));
+  $$('.del', plist).forEach(btn => btn.onclick = async () => {
+    if (!confirm('Delete this product?')) return;
+    await deleteDoc(doc(db, 'products', btn.dataset.id));
+    loadProducts();
+  });
 }
 
 function fillForm(p) {
