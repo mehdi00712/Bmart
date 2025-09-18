@@ -35,7 +35,7 @@ form.addEventListener('submit', async (e) => {
   if (!items.length) return alert('Cart is empty');
   const { st, fee, total } = calcTotal(method);
 
-  // ✅ read fields via FormData (avoid form.name/phone which collide with form props)
+  // Read fields via FormData (avoid form.name collision)
   const fd = new FormData(form);
   const buyerName = (fd.get('name') || '').toString().trim();
   const buyerPhone = (fd.get('phone') || '').toString().trim();
@@ -43,11 +43,10 @@ form.addEventListener('submit', async (e) => {
   if (!buyerName || !buyerPhone) return alert('Please enter name and phone.');
 
   const user = await ensureAuth();
-  const buyerEmail = (user.email || ''); // may be empty for anonymous checkout
+  const buyerEmail = (user.email || '');
 
   try {
     await runTransaction(db, async (tx) => {
-      // 1) verify & decrement stock on all products in cart
       const productRefs = items.map(it => doc(db, 'products', it.productId));
       const productSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)));
 
@@ -55,6 +54,7 @@ form.addEventListener('submit', async (e) => {
       const sellerUid = firstProd.ownerUid || 'UNKNOWN_SELLER';
       const shopId = firstProd.shopId || 'UNKNOWN_SHOP';
 
+      // Verify and decrement stock
       productSnaps.forEach((snap, i) => {
         if (!snap.exists()) throw new Error('Product not found: ' + items[i].productId);
         const p = snap.data();
@@ -63,13 +63,11 @@ form.addEventListener('submit', async (e) => {
         tx.update(productRefs[i], { stock: newStock, updatedAt: serverTimestamp() });
       });
 
-      // 2) create order with buyer details
+      // Create order
       const orderRef = doc(collection(db, 'orders'));
       tx.set(orderRef, {
         buyerUid: user.uid,
-        buyerName,
-        buyerPhone,
-        buyerEmail,
+        buyerName, buyerPhone, buyerEmail,
         shippingAddress,
         sellerUid, shopId,
         items: items.map(x => ({ productId: x.productId, title: x.title, price: x.price, qty: x.qty })),
