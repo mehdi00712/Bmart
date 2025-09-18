@@ -7,7 +7,21 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+
+<header class="nav">
+  <div class="logo"><a href="index.html" style="color:white;text-decoration:none">Bmart</a></div>
+  <nav style="display:flex;gap:12px;align-items:center">
+    <a href="index.html">Home</a>
+    <a href="cart.html">Cart</a>
+    <a href="checkout.html">Checkout</a>
+    <a href="login.html">Seller Login</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="admin.html">Admin</a>
+  </nav>
+</header>
+
 <main class="container" id="app"></main>
+
 <script type="module">
   import { db, doc, getDoc } from './firebase.js';
   import { addToCart } from './store.js';
