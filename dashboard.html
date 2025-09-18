@@ -7,7 +7,13 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<header class="nav"><div class="logo">Bmart — Seller</div></header>
+<header class="nav">
+  <div class="logo">Bmart — Seller</div>
+  <nav>
+    <a id="signout" href="#">Sign out</a>
+  </nav>
+</header>
+
 <main class="container">
   <section class="card">
     <h2>Add / Edit Product</h2>
@@ -33,6 +39,21 @@
     <div id="orders"></div>
   </section>
 </main>
+
+<script type="module">
+  import { auth } from './firebase.js';
+  import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
+  document.getElementById('signout').onclick = async (e) => {
+    e.preventDefault();
+    await signOut(auth);
+    location.href = 'login.html';
+  };
+
+  onAuthStateChanged(auth, (u) => {
+    if (!u) location.href = 'login.html';
+  });
+</script>
 <script type="module" src="seller.js"></script>
 </body>
 </html>
