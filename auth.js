@@ -13,13 +13,18 @@ const msg = document.getElementById('msg');
 function setMsg(t){ msg.textContent = t; }
 function getForm() {
   const fd = new FormData(form);
-  return { email: fd.get('email').trim(), password: fd.get('password') };
+  return { email: String(fd.get('email')).trim(), password: String(fd.get('password')) };
 }
 
-async function ensureUserDoc(uid, defaults) {
-  const ref = doc(db, 'users', uid);
+async function upsertUserDoc(u, defaults={}) {
+  const ref = doc(db, 'users', u.uid);
   const snap = await getDoc(ref);
-  if (!snap.exists()) await setDoc(ref, { createdAt: serverTimestamp(), ...defaults });
+  const base = { email: u.email || '', updatedAt: serverTimestamp() };
+  if (!snap.exists()) {
+    await setDoc(ref, { createdAt: serverTimestamp(), ...base, ...defaults });
+  } else {
+    await setDoc(ref, base, { merge: true });
+  }
 }
 
 form.addEventListener('submit', async (e)=>{
@@ -27,7 +32,8 @@ form.addEventListener('submit', async (e)=>{
   const { email, password } = getForm();
   try {
     setMsg('Signing in…');
-    await signInWithEmailAndPassword(auth, email, password);
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    await upsertUserDoc(cred.user);               // write/update email on login
     setMsg('Signed in. Redirecting…');
     location.href = 'dashboard.html';
   } catch (err) {
@@ -40,7 +46,7 @@ signupBtn.addEventListener('click', async ()=>{
   try {
     setMsg('Creating account…');
     const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await ensureUserDoc(cred.user.uid, { role: 'seller' });
+    await upsertUserDoc(cred.user, { role: 'seller' }); // default new sellers
     setMsg('Account created. Redirecting…');
     location.href = 'dashboard.html';
   } catch (err) {
