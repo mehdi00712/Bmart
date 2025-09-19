@@ -5,7 +5,7 @@ import { onCall } from "firebase-functions/v2/https";
 admin.initializeApp();
 
 // 🔒 ONLY YOU can run deletions — set YOUR UID here
-const SUPER_ADMIN_UID = "REPLACE_WITH_YOUR_UID";
+const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2";
 
 // Delete a collection by field in pages
 async function deleteByField(colRef, field, value) {
