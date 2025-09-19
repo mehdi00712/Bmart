@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin</title>
+  <title>Bmart — Admin</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
 <header class="nav">
   <div class="logo"><a href="index.html" style="color:white;text-decoration:none">Bmart</a></div>
   <nav style="display:flex;gap:12px;align-items:center">
@@ -21,9 +20,28 @@
 </header>
 
 <main class="container">
-  <h1>Admin</h1>
+  <h1>Admin — User Roles</h1>
+  <p class="muted" style="color:#9ca3af;margin-bottom:12px">
+    Only the super admin can view this page. Promote/demote users here.
+  </p>
   <div id="users"></div>
 </main>
+
+<!-- Guard: only allow YOUR UID to stay on this page -->
+<script type="module">
+  import { auth } from './firebase.js';
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
+  const SUPER_ADMIN_UID = "REPLACE_WITH_YOUR_UID"; // <-- put your UID here
+
+  onAuthStateChanged(auth, (u) => {
+    if (!u || u.uid !== SUPER_ADMIN_UID) {
+      location.href = 'index.html';
+    }
+  });
+</script>
+
+<!-- Actual admin page logic (renders users + role buttons) -->
 <script type="module" src="admin.js"></script>
 </body>
 </html>
