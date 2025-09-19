@@ -1,37 +1,99 @@
-import * as admin from "firebase-admin";
-import { onCall } from "firebase-functions/v2/https";
+import { db } from './firebase.js';
+import {
+  collection, getDocs, query, where, orderBy, limit, startAfter,
+  doc, updateDoc, deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
-admin.initializeApp();
+const usersDiv = document.getElementById('users');
 
-const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2"; // your Firebase Auth UID
+async function loadUsers() {
+  const snap = await getDocs(collection(db, 'users'));
+  const users = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                         .sort((a,b)=> (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
 
-// Deletes user + products + orders + profile
-export const deleteUserEverything = onCall(async (req) => {
-  const caller = req.auth?.uid;
-  const targetUid = req.data?.targetUid;
+  usersDiv.innerHTML = users.map(u => `
+    <div class="row">
+      <div style="flex:2;word-break:break-all">
+        <b>${u.displayName || u.email || u.id}</b><br>
+        <small>${u.id}</small>
+      </div>
+      <div style="flex:1">Role: <b>${u.role || 'buyer'}</b></div>
+      <div style="flex:2;display:flex;gap:8px;justify-content:flex-end">
+        ${u.role === 'banned'
+          ? `<button class="unban" data-id="${u.id}">Unban</button>`
+          : `<button class="ban" data-id="${u.id}" style="background:#6b7280">Ban</button>`}
+        <button class="wipe" data-id="${u.id}" style="background:#ef4444">Wipe Content</button>
+      </div>
+    </div>
+  `).join('');
 
-  if (!caller || caller !== SUPER_ADMIN_UID) {
-    throw new Error("unauthorized");
+  // Ban
+  usersDiv.querySelectorAll('.ban').forEach(btn => {
+    btn.onclick = async () => {
+      const uid = btn.dataset.id;
+      if (!confirm(`Ban this user?\nUID: ${uid}`)) return;
+      await updateDoc(doc(db, 'users', uid), { role: 'banned' });
+      alert('User banned (cannot post anymore).');
+      loadUsers();
+    };
+  });
+
+  // Unban
+  usersDiv.querySelectorAll('.unban').forEach(btn => {
+    btn.onclick = async () => {
+      const uid = btn.dataset.id;
+      if (!confirm(`Unban this user?\nUID: ${uid}`)) return;
+      await updateDoc(doc(db, 'users', uid), { role: 'seller' });
+      alert('User unbanned.');
+      loadUsers();
+    };
+  });
+
+  // Wipe Content (delete all products + orders)
+  usersDiv.querySelectorAll('.wipe').forEach(btn => {
+    btn.onclick = async () => {
+      const uid = btn.dataset.id;
+      if (!confirm(`Delete ALL products and orders for this user?\nUID: ${uid}`)) return;
+      try {
+        await wipeUserContent(uid);
+        alert('Content wiped.');
+      } catch (e) {
+        alert(e.message || 'Wipe failed');
+      }
+    };
+  });
+}
+
+async function deleteQueryBatched(colName, field, value, batchSize = 100) {
+  // Pages through a query and deletes docs one by one (client-safe)
+  let last = null, total = 0;
+  for (;;) {
+    let qy = query(
+      collection(db, colName),
+      where(field, '==', value),
+      orderBy('__name__'),
+      limit(batchSize)
+    );
+    if (last) qy = query(qy, startAfter(last));
+    const snap = await getDocs(qy);
+    if (snap.empty) break;
+    for (const d of snap.docs) {
+      await deleteDoc(d.ref);
+      total++;
+    }
+    last = snap.docs[snap.docs.length - 1];
+    if (snap.size < batchSize) break;
   }
-  if (!targetUid) throw new Error("missing-target-uid");
+  return total;
+}
 
-  const db = admin.firestore();
+async function wipeUserContent(uid) {
+  const p = await deleteQueryBatched('products', 'ownerUid', uid);
+  const os = await deleteQueryBatched('orders', 'sellerUid', uid);
+  const ob = await deleteQueryBatched('orders', 'buyerUid', uid);
+  // Optional: also clear their profile fields (do not delete the doc if you need the role to stay 'banned')
+  // await deleteDoc(doc(db, 'users', uid)); // not recommended; keep the 'banned' marker
+  console.log(`Deleted ${p} products, ${os} seller orders, ${ob} buyer orders`);
+}
 
-  // Delete products
-  const prods = await db.collection("products").where("ownerUid", "==", targetUid).get();
-  for (const d of prods.docs) await d.ref.delete();
-
-  // Delete orders (as seller or buyer)
-  const orders1 = await db.collection("orders").where("sellerUid", "==", targetUid).get();
-  for (const d of orders1.docs) await d.ref.delete();
-  const orders2 = await db.collection("orders").where("buyerUid", "==", targetUid).get();
-  for (const d of orders2.docs) await d.ref.delete();
-
-  // Delete user profile
-  await db.doc(`users/${targetUid}`).delete().catch(() => {});
-
-  // Delete Auth account
-  await admin.auth().deleteUser(targetUid);
-
-  return { ok: true };
-});
+loadUsers();
