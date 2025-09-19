@@ -50,7 +50,7 @@ export const onOrderStatusUpdated = onDocumentUpdated("orders/{orderId}", async 
  *  Super-admin callable: delete an Auth user (and optionally user doc)
  *  Only YOUR UID may call this.
  *  ────────────────────────────────────────────────────────────*/
-const SUPER_ADMIN_UID = "REPLACE_WITH_YOUR_UID"; // <-- put your UID
+const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2"; // <-- put your UID
 
 export const adminDeleteAuthUser = onCall(async (req) => {
   if (!req.auth || req.auth.uid !== SUPER_ADMIN_UID) {
