@@ -13,7 +13,7 @@ const msg = document.getElementById('msg');
 function setMsg(t){ msg.textContent = t; }
 function getForm() {
   const fd = new FormData(form);
-  return { email: String(fd.get('email')).trim(), password: String(fd.get('password')) };
+  return { email: String(fd.get('email')||'').trim(), password: String(fd.get('password')||'') };
 }
 
 async function upsertUserDoc(u, defaults={}) {
@@ -33,12 +33,10 @@ form.addEventListener('submit', async (e)=>{
   try {
     setMsg('Signing in…');
     const cred = await signInWithEmailAndPassword(auth, email, password);
-    await upsertUserDoc(cred.user);               // write/update email on login
+    await upsertUserDoc(cred.user); // write email on login
     setMsg('Signed in. Redirecting…');
     location.href = 'dashboard.html';
-  } catch (err) {
-    setMsg(err.message || 'Sign in failed');
-  }
+  } catch (err) { setMsg(err.message || 'Sign in failed'); }
 });
 
 signupBtn.addEventListener('click', async ()=>{
@@ -49,9 +47,7 @@ signupBtn.addEventListener('click', async ()=>{
     await upsertUserDoc(cred.user, { role: 'seller' }); // default new sellers
     setMsg('Account created. Redirecting…');
     location.href = 'dashboard.html';
-  } catch (err) {
-    setMsg(err.message || 'Sign up failed');
-  }
+  } catch (err) { setMsg(err.message || 'Sign up failed'); }
 });
 
 onAuthStateChanged(auth, (u)=>{ if (u) location.href = 'dashboard.html'; });
