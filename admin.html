@@ -16,32 +16,36 @@
     <a href="login.html">Seller Login</a>
     <a href="dashboard.html">Dashboard</a>
     <a href="admin.html">Admin</a>
+    <a href="admin_products.html" id="adminProductsLink">Admin Products</a>
   </nav>
 </header>
 
 <main class="container">
   <h1>Admin — User Roles</h1>
-  <p class="muted" style="color:#9ca3af;margin-bottom:12px">
-    Only the super admin can view this page. Promote/demote users here.
+  <p style="color:#9ca3af;margin-bottom:12px">
+    Only the super admin can view this page. Promote/demote users, or delete users entirely.
   </p>
   <div id="users"></div>
 </main>
 
-<!-- Guard: only allow YOUR UID to stay on this page -->
+<!-- Guard: only allow YOUR UID to stay on this page & show Admin Products link -->
 <script type="module">
   import { auth } from './firebase.js';
   import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
-  const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2"; // <-- put your UID here
+  const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2"; // <-- your UID
 
+  const productsLink = document.getElementById('adminProductsLink');
   onAuthStateChanged(auth, (u) => {
     if (!u || u.uid !== SUPER_ADMIN_UID) {
       location.href = 'index.html';
+    } else {
+      if (productsLink) productsLink.style.display = 'inline-block';
     }
   });
 </script>
 
-<!-- Actual admin page logic (renders users + role buttons) -->
+<!-- Admin logic -->
 <script type="module" src="admin.js"></script>
 </body>
 </html>
