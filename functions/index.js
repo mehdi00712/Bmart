@@ -1,69 +1,37 @@
-// functions/index.js
 import * as admin from "firebase-admin";
 import { onCall } from "firebase-functions/v2/https";
 
 admin.initializeApp();
 
-// 🔒 ONLY YOU can run deletions — set YOUR UID here
-const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2";
+const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2"; // your Firebase Auth UID
 
-// Delete a collection by field in pages
-async function deleteByField(colRef, field, value) {
+// Deletes user + products + orders + profile
+export const deleteUserEverything = onCall(async (req) => {
+  const caller = req.auth?.uid;
+  const targetUid = req.data?.targetUid;
+
+  if (!caller || caller !== SUPER_ADMIN_UID) {
+    throw new Error("unauthorized");
+  }
+  if (!targetUid) throw new Error("missing-target-uid");
+
   const db = admin.firestore();
-  const pageSize = 300;
-  let last = null;
 
-  for (;;) {
-    let q = colRef
-      .where(field, "==", value)
-      .orderBy(admin.firestore.FieldPath.documentId())
-      .limit(pageSize);
+  // Delete products
+  const prods = await db.collection("products").where("ownerUid", "==", targetUid).get();
+  for (const d of prods.docs) await d.ref.delete();
 
-    if (last) q = q.startAfter(last);
+  // Delete orders (as seller or buyer)
+  const orders1 = await db.collection("orders").where("sellerUid", "==", targetUid).get();
+  for (const d of orders1.docs) await d.ref.delete();
+  const orders2 = await db.collection("orders").where("buyerUid", "==", targetUid).get();
+  for (const d of orders2.docs) await d.ref.delete();
 
-    const snap = await q.get();
-    if (snap.empty) break;
+  // Delete user profile
+  await db.doc(`users/${targetUid}`).delete().catch(() => {});
 
-    const batch = db.batch();
-    snap.docs.forEach((d) => batch.delete(d.ref));
-    await batch.commit();
+  // Delete Auth account
+  await admin.auth().deleteUser(targetUid);
 
-    last = snap.docs[snap.docs.length - 1];
-    if (snap.size < pageSize) break;
-  }
-}
-
-// Callable: delete user’s products, orders, profile, AND Auth account
-export const deleteUserEverything = onCall(
-  { region: "us-central1", timeoutSeconds: 540, memory: "512MiB" },
-  async (req) => {
-    const caller = req.auth?.uid;
-    const targetUid = req.data?.targetUid;
-
-    console.log("deleteUserEverything called by", caller, "for", targetUid);
-
-    if (!caller || caller !== SUPER_ADMIN_UID) {
-      console.error("Unauthorized caller");
-      throw new Error("unauthorized");
-    }
-    if (!targetUid) {
-      console.error("Missing targetUid");
-      throw new Error("missing-target-uid");
-    }
-
-    const db = admin.firestore();
-
-    try {
-      await deleteByField(db.collection("products"), "ownerUid", targetUid);
-      await deleteByField(db.collection("orders"), "sellerUid", targetUid);
-      await deleteByField(db.collection("orders"), "buyerUid", targetUid);
-      await db.doc(`users/${targetUid}`).delete().catch(() => {});
-      await admin.auth().deleteUser(targetUid); // deletes Auth account
-      console.log("Deleted EVERYTHING for", targetUid);
-      return { ok: true };
-    } catch (e) {
-      console.error("deleteUserEverything FAILED", e);
-      throw new Error(e?.message || "internal");
-    }
-  }
-);
+  return { ok: true };
+});
