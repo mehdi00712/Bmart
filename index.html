@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
 <header class="nav">
   <div class="logo"><a href="index.html" style="color:white;text-decoration:none">Bmart</a></div>
   <nav style="display:flex;gap:12px;align-items:center">
@@ -16,7 +15,7 @@
     <a href="checkout.html">Checkout</a>
     <a href="login.html">Seller Login</a>
     <a href="dashboard.html">Dashboard</a>
-    <a href="admin.html">Admin</a>
+    <a href="admin.html" id="adminLink">Admin</a>
   </nav>
 </header>
 
@@ -30,21 +29,35 @@
 </main>
 
 <script type="module">
-  import { db, collection, getDocs, registerFcmToken } from './firebase.js';
+  import { db, collection, getDocs, registerFcmToken, auth } from './firebase.js';
   import { fmtCurrency } from './util.js';
   import { getCart } from './store.js';
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
+  // Optional: hide Admin link unless it's YOU
+  const SUPER_ADMIN_UID = "REPLACE_WITH_YOUR_UID"; // <-- same UID as in admin.html
+  const adminLink = document.getElementById('adminLink');
+  onAuthStateChanged(auth, (u) => {
+    if (!u || u.uid !== SUPER_ADMIN_UID) {
+      if (adminLink) adminLink.style.display = 'none';
+    }
+  });
+
+  // Cart count
   document.getElementById('cartCount').textContent =
     getCart().reduce((n, it) => n + it.qty, 0);
 
-  registerFcmToken(); // optional
+  // Optional web push token registration
+  registerFcmToken().catch(()=>{});
 
   const grid = document.getElementById('grid');
   const qInput = document.getElementById('q');
 
   async function loadProducts(term = '') {
     const snap = await getDocs(collection(db, 'products'));
-    const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.isActive !== false);
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.isActive !== false);
+
     const filtered = term
       ? items.filter(p => (p.title || '').toLowerCase().includes(term.toLowerCase()))
       : items;
@@ -57,7 +70,7 @@
           <p>${fmtCurrency(p.price)}</p>
         </div>
       </a>
-    `).join('');
+    ).join('');
   }
 
   qInput.addEventListener('input', e => loadProducts(e.target.value));
