@@ -1,70 +1,58 @@
-import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import { onCall } from "firebase-functions/v2/https";
 
 admin.initializeApp();
 
-/** ─────────────────────────────────────────────────────────────
- *  Push notifications (keep if you want, safe to leave here)
- *  Update/trim these if you’re not using FCM.
- *  ────────────────────────────────────────────────────────────*/
-async function sendPush(tokens, title, body, data = {}) {
-  if (!tokens || tokens.length === 0) return;
-  const message = { notification: { title, body }, data };
-  const chunk = 500;
-  for (let i = 0; i < tokens.length; i += chunk) {
-    const batch = tokens.slice(i, i + chunk);
-    await admin.messaging().sendEachForMulticast({ ...message, tokens: batch });
+// ---- SUPER ADMIN UID (ONLY YOU) ----
+const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2";
+
+// Utility: batch-delete a query in pages
+async function deleteByQuery(colRef, field, value) {
+  const db = admin.firestore();
+  const pageSize = 300;
+  let last = null;
+  while (true) {
+    let q = colRef.where(field, "==", value).orderBy(admin.firestore.FieldPath.documentId()).limit(pageSize);
+    if (last) q = q.startAfter(last);
+    const snap = await q.get();
+    if (snap.empty) break;
+    const batch = db.batch();
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+    last = snap.docs[snap.docs.length - 1];
+    if (snap.size < pageSize) break;
   }
 }
 
-export const onOrderCreated = onDocumentCreated("orders/{orderId}", async (event) => {
-  const order = event.data?.data();
-  if (!order) return;
-  const sellerUid = order.sellerUid;
-  if (!sellerUid) return;
-  const sellerDoc = await admin.firestore().doc(`users/${sellerUid}`).get();
-  const tokens = sellerDoc.get("fcmTokens") || [];
-  await sendPush(tokens, "New order", `Rs ${order.total} from a buyer`, {
-    orderId: event.params.orderId,
-    role: "seller"
-  });
-});
-
-export const onOrderStatusUpdated = onDocumentUpdated("orders/{orderId}", async (event) => {
-  const before = event.data?.before?.data();
-  const after = event.data?.after?.data();
-  if (!before || !after) return;
-  if (before.status === after.status) return;
-  const buyerUid = after.buyerUid;
-  if (!buyerUid) return;
-  const buyerDoc = await admin.firestore().doc(`users/${buyerUid}`).get();
-  const tokens = buyerDoc.get("fcmTokens") || [];
-  await sendPush(tokens, "Order update", `Status: ${after.status}`, {
-    orderId: event.params.orderId,
-    role: "buyer"
-  });
-});
-
-/** ─────────────────────────────────────────────────────────────
- *  Super-admin callable: delete an Auth user (and optionally user doc)
- *  Only YOUR UID may call this.
- *  ────────────────────────────────────────────────────────────*/
-const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2"; // <-- put your UID
-
-export const adminDeleteAuthUser = onCall(async (req) => {
-  if (!req.auth || req.auth.uid !== SUPER_ADMIN_UID) {
-    throw new HttpsError("permission-denied", "Only super admin can delete users.");
+export const deleteUserEverything = onCall(async (req) => {
+  // Auth check
+  const caller = req.auth?.uid;
+  if (!caller || caller !== SUPER_ADMIN_UID) {
+    throw new Error("unauthorized");
   }
-  const uid = String(req.data?.uid || "");
-  if (!uid) throw new HttpsError("invalid-argument", "uid is required");
-  if (uid === SUPER_ADMIN_UID) throw new HttpsError("failed-precondition", "Cannot delete super admin.");
 
-  // Delete Firebase Auth account
-  await admin.auth().deleteUser(uid);
+  const targetUid = req.data?.targetUid;
+  if (!targetUid) throw new Error("Missing targetUid");
 
-  // Optional: also delete their Firestore user doc server-side
-  try { await admin.firestore().doc(`users/${uid}`).delete(); } catch { /* ignore */ }
+  const db = admin.firestore();
 
-  return { ok: true, deleted: uid };
+  // 1) Delete products owned by target
+  await deleteByQuery(db.collection("products"), "ownerUid", targetUid);
+
+  // 2) Delete orders where the user is the seller
+  await deleteByQuery(db.collection("orders"), "sellerUid", targetUid);
+
+  // 3) (Optional) Delete orders where the user is the buyer too
+  await deleteByQuery(db.collection("orders"), "buyerUid", targetUid);
+
+  // 4) Delete the user profile doc
+  await db.doc(`users/${targetUid}`).delete().catch(()=>{});
+
+  // 5) Delete Auth account
+  await admin.auth().deleteUser(targetUid).catch((e) => {
+    // If already gone, ignore
+    if (e?.errorInfo?.code !== "auth/user-not-found") throw e;
+  });
+
+  return { ok: true };
 });
