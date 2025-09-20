@@ -1,45 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Bmart — Sign in / Sign up</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bmart — Login</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
-<header class="nav">
-  <div class="logo"><a href="index.html" style="color:white;text-decoration:none">Bmart</a></div>
-  <nav style="display:flex;gap:12px;align-items:center">
-    <a href="index.html">Home</a>
-    <a href="cart.html">Cart</a>
-    <a href="checkout.html">Checkout</a>
-    <a href="login.html">Seller Login</a>
-    <a href="dashboard.html">Dashboard</a>
-    <a href="admin.html">Admin</a>
-  </nav>
-</header>
-
 <main class="container">
-  <h1>Seller Sign in / Sign up</h1>
-
-  <section class="card" style="max-width:520px;margin:auto;">
-    <form id="authForm">
-      <label>Email <input name="email" type="email" required></label>
-      <label>Password <input name="password" type="password" required minlength="6"></label>
-      <div class="row" style="border:none;padding:0">
-        <button type="submit" id="loginBtn">Sign in</button>
-        <button type="button" id="signupBtn">Create account</button>
-      </div>
-    </form>
-    <p id="msg" style="color:#9ca3af"></p>
-  </section>
-
-  <p style="text-align:center;margin-top:16px">
-    After signing in, you’ll be redirected to the <a href="dashboard.html">Seller Dashboard</a>.
-  </p>
+  <h1>Login</h1>
+  <form id="loginForm" class="card" style="padding:12px;max-width:420px">
+    <label>Email <input type="email" name="email" required></label>
+    <label>Password <input type="password" name="password" required></label>
+    <button type="submit">Login</button>
+  </form>
+  <p style="margin-top:8px">No account? <a href="signup.html">Sign up</a></p>
 </main>
 
-<script type="module" src="auth.js"></script>
+<script type="module">
+  import { auth, signInWithEmailAndPassword } from './firebase.js';
+  const form = document.getElementById('loginForm');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = form.email.value.trim();
+    const password = form.password.value;
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      location.href = 'index.html';
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+</script>
 </body>
 </html>
