@@ -5,10 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bmart — Product</title>
   <link rel="stylesheet" href="style.css" />
-  <style>
-    .error-box{background:#24151a;border:1px solid #7f1d1d;color:#fecaca;padding:12px;border-radius:10px;margin:12px 0}
-    .muted{color:#9ca3af}
-  </style>
+  <style>.muted{color:#9ca3af}</style>
 </head>
 <body>
 <header class="nav">
@@ -17,140 +14,64 @@
     <a href="index.html">Home</a>
     <a href="cart.html">Cart</a>
     <a href="checkout.html">Checkout</a>
-    <a href="login.html">Seller Login</a>
-    <a href="dashboard.html">Dashboard</a>
-    <a href="admin.html">Admin</a>
+    <a href="login.html">Login</a>
+    <a href="signup.html">Sign up</a>
   </nav>
 </header>
 
-<main class="container" id="app">
-  <!-- content injected by script -->
-</main>
+<main class="container" id="app"></main>
 
 <script type="module">
-  // ---- Small helpers (inline to avoid path issues) ----
-  function readQuery(key){ return new URL(location.href).searchParams.get(key); }
+  function readQuery(k){ return new URL(location.href).searchParams.get(k); }
   function fmtCurrency(x){ return `Rs ${Number(x||0).toFixed(2)}`; }
   function showError(msg, details=''){
     const app = document.getElementById('app');
-    app.innerHTML = `
-      <div class="error-box">
-        <b>${msg}</b>
-        ${details ? `<div class="muted" style="margin-top:6px;white-space:pre-wrap">${details}</div>` : ''}
-      </div>`;
+    app.innerHTML = `<div class="card" style="padding:12px;background:#24151a;border:1px solid #7f1d1d;color:#fecaca">
+      <b>${msg}</b>${details?`<div class="muted" style="white-space:pre-wrap;margin-top:6px">${details}</div>`:''}
+    </div>`;
   }
 
   const id = readQuery('id');
   const app = document.getElementById('app');
+  if (!id) { showError('Missing product id in URL'); throw new Error('No id'); }
 
-  // Early guard: missing id
-  if (!id) {
-    showError('Missing product id in URL.',
-      'Open product via a link like product.html?id=YOUR_PRODUCT_DOC_ID');
-    throw new Error('Missing product id');
-  }
+  const { db, doc, getDoc } = await import('./firebase.js');
+  const { addToCart } = await import('./store.js');
+  const { initReviews } = await import('./reviews.js');
 
-  try {
-    // Import modules (make sure these files exist in the SAME FOLDER)
-    const { db, doc, getDoc, ensureUserDoc } = await import('./firebase.js');
-    const { addToCart } = await import('./store.js');
-    const { initReviews } = await import('./reviews.js');
+  async function render(){
+    const snap = await getDoc(doc(db, 'products', id)).catch(e => { showError('Could not load product', String(e)); throw e; });
+    if (!snap.exists()) { showError('Product not found'); return; }
+    const p = snap.data();
+    const img0 = (p.images && p.images[0]) || 'https://via.placeholder.com/800x600?text=Product';
 
-    async function render() {
-      // Ensure auth + users/{uid} doc exists (prevents review rule issues)
-      await ensureUserDoc().catch(e => console.warn('ensureUserDoc failed', e));
-
-      // Load product
-      let snap;
-      try {
-        snap = await getDoc(doc(db, 'products', id));
-      } catch (e) {
-        console.error('getDoc failed', e);
-        showError('Could not load product.', String(e && (e.message||e)));
-        return;
-      }
-
-      if (!snap.exists()) {
-        showError('Product not found.',
-          `We looked for document: products/${id}\nMake sure the id is correct and Firestore has this document.`);
-        return;
-      }
-
-      const p = snap.data();
-      const img0 = (p.images && p.images[0]) || 'https://via.placeholder.com/800x600?text=Product';
-
-      app.innerHTML = `
-        <div class="product">
-          <img src="${img0}" alt="${p.title}">
-          <div>
-            <h1>${p.title || 'Untitled product'}</h1>
-            <p class="price">${fmtCurrency(Number(p.price || 0))}</p>
-            ${p.category ? `<div class="muted" style="margin-bottom:6px">${p.category}</div>` : ''}
-            <p>${(p.description || '').toString().replace(/</g,'&lt;')}</p>
-
-            <label>Qty
-              <input type="number" id="qty" min="1" value="1" style="max-width:100px">
-            </label>
-
-            <div class="row" style="border:none;padding:0;gap:8px;margin-top:8px">
-              <button id="add">Add to Cart</button>
-              <a href="index.html" class="btn" style="text-decoration:none">Continue Shopping</a>
-            </div>
+    app.innerHTML = `
+      <div class="product">
+        <img src="${img0}" alt="${p.title}">
+        <div>
+          <h1>${p.title || 'Untitled product'}</h1>
+          <p class="price">${fmtCurrency(Number(p.price || 0))}</p>
+          ${p.category ? `<div class="muted" style="margin-bottom:6px">${p.category}</div>` : ''}
+          <p>${(p.description || '').toString().replace(/</g,'&lt;')}</p>
+          <label>Qty <input type="number" id="qty" min="1" value="1" style="max-width:100px"></label>
+          <div class="row" style="border:none;padding:0;gap:8px;margin-top:8px">
+            <button id="add">Add to Cart</button>
+            <a href="index.html" class="btn" style="text-decoration:none">Continue Shopping</a>
           </div>
         </div>
+      </div>
+      <section id="reviews" style="margin-top:24px"></section>
+    `;
 
-        <!-- Reviews block -->
-        <section id="reviews" style="margin-top:24px"></section>
-      `;
+    document.getElementById('add').onclick = () => {
+      const qty = Math.max(1, Number(document.getElementById('qty').value || '1'));
+      addToCart({ productId:id, title:p.title||'Product', price:Number(p.price||0), qty, sellerUid:p.ownerUid, shopId:p.shopId });
+      alert('Added to cart');
+    };
 
-      // Add to cart
-      const addBtn = document.getElementById('add');
-      addBtn.onclick = () => {
-        const qty = Math.max(1, Number(document.getElementById('qty').value || '1'));
-        try {
-          addToCart({
-            productId: id,
-            title: p.title || 'Product',
-            price: Number(p.price || 0),
-            qty,
-            sellerUid: p.ownerUid,
-            shopId: p.shopId
-          });
-          alert('Added to cart');
-        } catch (e) {
-          console.error('addToCart error', e);
-          showError('Could not add to cart.', String(e && (e.message||e)));
-        }
-      };
-
-      // Reviews
-      try {
-        await initReviews(id);
-      } catch (e) {
-        console.error('initReviews error', e);
-        const reviews = document.getElementById('reviews');
-        if (reviews) {
-          reviews.innerHTML = `
-            <div class="error-box">
-              <b>Reviews failed to load.</b>
-              <div class="muted" style="margin-top:6px">${String(e && (e.message||e))}</div>
-              <div class="muted" style="margin-top:6px">Check that reviews.js exists and Firestore rules are published.</div>
-            </div>`;
-        }
-      }
-    }
-
-    render().catch(e => {
-      console.error('render crashed', e);
-      showError('Unexpected error rendering product page.', String(e && (e.message||e)));
-    });
-
-  } catch (e) {
-    // If imports fail (wrong paths / missing files), show it on the page
-    console.error('Import error', e);
-    showError('Could not load scripts.',
-      `Make sure these files exist next to product.html:\n- firebase.js\n- reviews.js\n- store.js\n\nError: ${String(e && (e.message||e))}`);
+    await initReviews(id); // shows form if signed in; else invites to login
   }
+  render();
 </script>
 </body>
 </html>
