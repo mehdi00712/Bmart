@@ -3,42 +3,87 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Checkout</title>
+  <title>Bmart — Checkout</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
 <header class="nav">
   <div class="logo"><a href="index.html" style="color:white;text-decoration:none">Bmart</a></div>
   <nav style="display:flex;gap:12px;align-items:center">
     <a href="index.html">Home</a>
     <a href="cart.html">Cart</a>
-    <a href="checkout.html">Checkout</a>
-    <a href="login.html">Seller Login</a>
-    <a href="dashboard.html">Dashboard</a>
-    <a href="admin.html">Admin</a>
+    <a href="login.html">Login</a>
   </nav>
 </header>
 
 <main class="container">
   <h1>Checkout</h1>
   <div id="summary"></div>
-  <form id="form" class="card">
+  <form id="form" class="card" style="padding:12px">
     <label>Name <input required name="name"></label>
     <label>Phone <input required name="phone"></label>
     <label>Address <textarea name="address" placeholder="If delivery/postage"></textarea></label>
-
     <fieldset>
       <legend>Delivery Method</legend>
       <label><input type="radio" name="dm" value="pickup" checked> Pick up (Rs 0)</label>
       <label><input type="radio" name="dm" value="delivery"> Delivery (Rs 150)</label>
       <label><input type="radio" name="dm" value="postage"> Postage (Rs 125)</label>
     </fieldset>
-
     <p id="total"></p>
-    <button type="submit">Place Order</button>
+    <button type="submit">Place Order (COD/Transfer)</button>
   </form>
 </main>
-<script type="module" src="checkout.js"></script>
+
+<script type="module">
+  import { db, requireAuth, ensureUserDoc, collection, addDoc, serverTimestamp } from './firebase.js';
+  import { getCart, clearCart, subtotal } from './store.js';
+  const FEES = { pickup:0, delivery:150, postage:125 };
+
+  // Must be signed in to checkout
+  await requireAuth();
+  await ensureUserDoc();
+
+  const items = getCart();
+  const summary = document.getElementById('summary');
+  const totalEl = document.getElementById('total');
+  const form = document.getElementById('form');
+
+  if (!items.length) summary.innerHTML = '<p>Cart is empty.</p>';
+  else summary.innerHTML = items.map(it => `<div class="row"><div>${it.title}</div><div>× ${it.qty}</div><div>Rs ${(it.qty*it.price).toFixed(2)}</div></div>`).join('');
+
+  function calcTotal(method) {
+    const st = subtotal();
+    const fee = FEES[method] || 0;
+    totalEl.textContent = `Subtotal: Rs ${st.toFixed(2)}  +  ${method} fee: Rs ${fee.toFixed(2)}  =  Total: Rs ${(st+fee).toFixed(2)}`;
+    return { st, fee, total: st + fee };
+  }
+  let method = 'pickup';
+  calcTotal(method);
+  form.dm.forEach(r => r.addEventListener('change', () => { method = form.dm.value; calcTotal(method); }));
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!items.length) return alert('Cart is empty');
+    const { st, fee, total } = calcTotal(method);
+
+    // MVP assume one seller
+    const sellerUid = items[0].sellerUid || 'UNKNOWN_SELLER';
+    const shopId = items[0].shopId || 'UNKNOWN_SHOP';
+
+    const order = {
+      buyerUid: (await requireAuth()).uid,
+      sellerUid, shopId,
+      items: items.map(x => ({ productId:x.productId, title:x.title, price:x.price, qty:x.qty })),
+      subtotal: st, deliveryMethod: method, deliveryFee: fee, total,
+      status: 'pending', shippingAddress: form.address.value || '',
+      createdAt: serverTimestamp(),
+      buyerName: form.name.value, buyerPhone: form.phone.value
+    };
+    await addDoc(collection(db, 'orders'), order);
+    clearCart();
+    alert('Order placed!');
+    location.href = 'index.html';
+  });
+</script>
 </body>
 </html>
