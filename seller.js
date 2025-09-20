@@ -37,21 +37,26 @@ imgInput?.addEventListener('change', async () => {
 });
 
 const user = await ensureAuth();
+// Ensure user doc exists (mark as seller if first time)
 const userRef = doc(db, 'users', user.uid);
 const uSnap = await getDoc(userRef);
 if (!uSnap.exists()) {
   await setDoc(userRef, { role: 'seller', createdAt: serverTimestamp() });
 }
 
+// Save product
 pform.addEventListener('submit', async (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(pform).entries());
+
+  // Normalize category: trim + lowercase (so filters match)
+  const category = (data.category || '').trim().toLowerCase();
 
   const prod = {
     title: data.title,
     price: Number(data.price || 0),
     stock: Number(data.stock || 0),
-    category: data.category || '',
+    category,
     description: data.description || '',
     images: imageUrl ? [imageUrl] : [],
     ownerUid: user.uid,
@@ -77,7 +82,7 @@ async function loadProducts() {
   plist.innerHTML = items.map(p => `
     <div class="row">
       <div><img class="thumb" src="${(p.images && p.images[0]) || ''}"></div>
-      <div><b>${p.title}</b><br>${fmtCurrency(p.price)} · Stock: ${p.stock}</div>
+      <div><b>${p.title}</b><br>${fmtCurrency(p.price)} · Stock: ${p.stock}${p.category ? ` · ${p.category}` : ''}</div>
       <div>
         <button data-id="${p.id}" class="edit">Edit</button>
         <button data-id="${p.id}" class="del" style="background:#ef4444">Delete</button>
@@ -123,7 +128,7 @@ onSnapshot(
         </div>
       `;
       return `
-        <div class="card">
+        <div class="card" style="padding:12px">
           <b>Order ${o.id.slice(-6)}</b> · ${o.status} ·
           <span style="color:#9ca3af">${when}</span><br>
           ${buyerLine}
