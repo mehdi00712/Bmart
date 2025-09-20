@@ -3,70 +3,124 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bmart — Marketplace</title>
+  <title>Bmart</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 <header class="nav">
-  <div class="logo"><a href="index.html">Bmart</a></div>
-  <nav>
-    <input id="q" placeholder="Search products..." />
-    <a href="cart.html">Cart (<span id="cartCount">0</span>)</a>
+  <div class="logo"><a href="index.html" style="color:white;text-decoration:none">Bmart</a></div>
+  <nav style="display:flex;gap:12px;align-items:center">
+    <a href="index.html">Home</a>
+    <a href="cart.html">Cart</a>
     <a href="checkout.html">Checkout</a>
-    <a href="dashboard.html">Seller Dashboard</a>
-    <a href="admin.html">Admin</a>
-    <a href="login.html">User Login</a>
+    <a href="login.html">Seller Login</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="admin.html" id="adminLink">Admin</a>
   </nav>
 </header>
 
 <main class="container">
   <h1>Featured Products</h1>
+
+  <div class="row" style="border:none;padding:0;gap:12px;flex-wrap:wrap">
+    <input id="q" placeholder="Search products or categories…" style="max-width:360px">
+    <div>Cart (<span id="cartCount">0</span>)</div>
+  </div>
+
+  <!-- Category Filter -->
+  <div id="categories" style="margin:8px 0 16px; display:flex; gap:8px; flex-wrap:wrap;"></div>
+
   <div id="grid" class="grid"></div>
 </main>
 
-<!-- Firebase + App logic -->
 <script type="module">
-  import { db, collection, getDocs } from "./firebase.js";
-  import { fmtCurrency } from "./util.js";
-  import { getCart } from "./store.js";
+  import { db, collection, getDocs, auth } from './firebase.js';
+  import { fmtCurrency } from './util.js';
+  import { getCart } from './store.js';
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
+  // Optional: hide Admin link unless it's YOU
+  const SUPER_ADMIN_UID = "REPLACE_WITH_YOUR_UID"; // set if you want the Admin link hidden for others
+  const adminLink = document.getElementById('adminLink');
+  onAuthStateChanged(auth, (u) => {
+    if (!SUPER_ADMIN_UID || !adminLink) return;
+    if (!u || u.uid !== SUPER_ADMIN_UID) adminLink.style.display = 'none';
+  });
+
+  const grid = document.getElementById('grid');
+  const categoriesDiv = document.getElementById('categories');
+  const qInput = document.getElementById('q');
 
   // Cart count
-  document.getElementById("cartCount").textContent =
+  document.getElementById('cartCount').textContent =
     getCart().reduce((n, it) => n + it.qty, 0);
 
-  const grid = document.getElementById("grid");
-  const qInput = document.getElementById("q");
+  let allProducts = [];
+  let activeCategory = 'all';
 
-  async function loadProducts(term = "") {
-    const snap = await getDocs(collection(db, "products"));
-    const items = snap.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .filter((p) => p.isActive !== false);
+  async function loadProducts() {
+    const snap = await getDocs(collection(db, 'products'));
+    allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.isActive !== false);
 
-    const filtered = term
-      ? items.filter((p) =>
-          (p.title || "").toLowerCase().includes(term.toLowerCase())
-        )
-      : items;
+    renderCategories();
+    renderProducts(allProducts);
+  }
 
-    grid.innerHTML = filtered
-      .map(
-        (p) => `
+  function renderProducts(items) {
+    grid.innerHTML = items.map(p => `
       <a class="card" href="product.html?id=${p.id}">
-        <img src="${
-          (p.images && p.images[0]) ||
-          "https://via.placeholder.com/600x400?text=Product"
-        }" alt="${p.title}">
+        <img src="${(p.images && p.images[0]) || 'https://via.placeholder.com/600x400?text=Product'}" alt="${p.title}">
         <div class="p-2">
           <h3>${p.title}</h3>
           <p>${fmtCurrency(p.price)}</p>
+          ${(p.category ? `<small style="color:#9ca3af">${p.category}</small>` : '')}
         </div>
-      </a>`
-      )
-      .join("");
+      </a>`).join('');
   }
 
-  qInput.addEventListener("input", (e) => loadProducts(e.target.value));
+  function renderCategories() {
+    // Gather unique, non-empty category list (case-insensitive, normalized)
+    const cats = [...new Set(
+      allProducts
+        .map(p => (p.category || '').trim())
+        .filter(Boolean)
+        .map(c => c.toLowerCase())
+    )].sort();
+
+    categoriesDiv.innerHTML =
+      `<button data-cat="all" class="btn" style="${activeCategory==='all'?'outline:1px solid #444':''}">All</button>` +
+      cats.map(c =>
+        `<button data-cat="${c}" class="btn" style="${activeCategory===c?'outline:1px solid #444':''}">${c}</button>`
+      ).join('');
+
+    categoriesDiv.querySelectorAll('button').forEach(btn => {
+      btn.onclick = () => {
+        activeCategory = btn.dataset.cat;
+        filterAndRender();
+        renderCategories(); // refresh outline on active button
+      };
+    });
+  }
+
+  function filterAndRender() {
+    const term = (qInput.value || '').toLowerCase().trim();
+    let items = allProducts;
+
+    if (activeCategory !== 'all') {
+      items = items.filter(p => (p.category || '').toLowerCase() === activeCategory);
+    }
+    if (term) {
+      items = items.filter(p =>
+        (p.title || '').toLowerCase().includes(term) ||
+        (p.category || '').toLowerCase().includes(term)
+      );
+    }
+    renderProducts(items);
+  }
+
+  qInput.addEventListener('input', filterAndRender);
+
   loadProducts();
 </script>
 </body>
