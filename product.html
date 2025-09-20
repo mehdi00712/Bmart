@@ -24,7 +24,7 @@
 </main>
 
 <script type="module">
-  import { db, doc, getDoc } from './firebase.js';
+  import { db, doc, getDoc, ensureUserDoc } from './firebase.js';
   import { addToCart } from './store.js';
   import { fmtCurrency, readQuery } from './util.js';
   import { initReviews } from './reviews.js';
@@ -78,7 +78,8 @@
       alert('Added to cart');
     };
 
-    // Initialize inline reviews (Delete for seller/admin/reviewer; Ban for admin)
+    // Ensure users/{uid} exists with role: "buyer", then load reviews.
+    await ensureUserDoc();
     await initReviews(id);
   }
 
