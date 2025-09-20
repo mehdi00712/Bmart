@@ -15,24 +15,23 @@
     <a href="checkout.html">Checkout</a>
     <a href="login.html">Seller Login</a>
     <a href="dashboard.html">Dashboard</a>
-    <a href="admin.html">Admin</a>
-    <a href="admin_products.html">Admin Products</a>
+    <a href="admin.html" id="adminLink">Admin</a>
   </nav>
 </header>
 
 <main class="container">
-  <h1>Admin — User Roles & Deletion</h1>
-  <p class="muted" style="color:#9ca3af;margin-bottom:12px">
-    Only super admin can view this page. You can promote/demote and permanently delete users (and all their data).
+  <h1>Admin — Users</h1>
+  <p style="color:#9ca3af;margin-bottom:12px">
+    <b>Ban</b> blocks a user from posting. <b>Wipe Content</b> removes all their products & orders.
   </p>
   <div id="users"></div>
 </main>
 
-<!-- Guard: only allow YOUR UID -->
+<!-- UI guard: only YOUR UID can view this page -->
 <script type="module">
   import { auth } from './firebase.js';
   import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-  const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2";
+  const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2"; // <-- your UID
   onAuthStateChanged(auth, (u) => { if (!u || u.uid !== SUPER_ADMIN_UID) location.href = 'index.html'; });
 </script>
 
