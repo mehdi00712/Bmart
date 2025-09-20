@@ -1,8 +1,8 @@
-// firebase.js — single-file setup for GitHub Pages
+// firebase.js — email/password required
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
-  getAuth, onAuthStateChanged, signInAnonymously,
+  getAuth, onAuthStateChanged,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import {
@@ -21,35 +21,42 @@ export const firebaseConfig = {
   measurementId: "G-L8M8WH1D5V"
 };
 
-// --- Core inits ---
+// --- init ---
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// --- Auth helpers ---
-/** Ensures there is a signed-in user (anonymous is fine). Resolves with the user. */
-export async function ensureAuth() {
-  if (auth.currentUser) return auth.currentUser;
-  return new Promise(async (resolve) => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (u) { unsub && unsub(); resolve(u); }
+// --- Auth guards ---
+/** Redirects to login.html if not signed in; resolves with user */
+export async function requireAuth() {
+  return new Promise((resolve, reject) => {
+    onAuthStateChanged(auth, (user) => {
+      if (user) resolve(user);
+      else {
+        window.location.href = "login.html";
+        reject(new Error("Not signed in"));
+      }
     });
-    try { await signInAnonymously(auth); } catch (_) {}
   });
 }
 
-export { signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword };
+/** Returns current user or null (no redirect) */
+export function currentUser() {
+  return auth.currentUser || null;
+}
 
-// --- Firestore: ensure users/{uid} exists with role: "buyer" ---
+/** Ensure users/{uid} exists with role: "buyer" */
 export async function ensureUserDoc() {
-  const u = await ensureAuth();
+  const u = await requireAuth();
   const ref = doc(db, "users", u.uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) {
-    await setDoc(ref, { role: "buyer", createdAt: serverTimestamp() });
+    await setDoc(ref, { role: "buyer", email: u.email || "", createdAt: serverTimestamp() });
   }
   return u;
 }
+
+export { signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword };
 
 // --- Re-export Firestore utils used elsewhere ---
 export {
