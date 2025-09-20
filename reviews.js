@@ -166,25 +166,23 @@ export async function initReviews(productId) {
   }
 
   // Save (create or update my review)
-  saveBtn.onclick = async () => {
-    try {
-      const stars = Number(starsEl.value || 5);
-      const comment = (commentEl.value || '').slice(0, 1000);
-      const buyerName = nameEl.value || '';
-
-      const mine = await fetchMyReview();
-      if (mine) {
-        await updateDoc(mine.ref, { buyerUid: user.uid, buyerName, stars, comment, createdAt: serverTimestamp() });
-      } else {
-        await addDoc(collection(db, 'products', productId, 'reviews'), {
-          buyerUid: user.uid, buyerName, stars, comment, createdAt: serverTimestamp()
-        });
-      }
-      await render();
-      alert('Saved!');
-    } catch (e) {
-      alert(e.message || 'Failed to save review');
+  const save = async () => {
+    const stars = Number(starsEl.value || 5);
+    const comment = (commentEl.value || '').slice(0, 1000);
+    const buyerName = nameEl.value || '';
+    const mine = await fetchMyReview();
+    if (mine) {
+      await updateDoc(mine.ref, { buyerUid: user.uid, buyerName, stars, comment, createdAt: serverTimestamp() });
+    } else {
+      await addDoc(collection(db, 'products', productId, 'reviews'), {
+        buyerUid: user.uid, buyerName, stars, comment, createdAt: serverTimestamp()
+      });
     }
+  };
+
+  saveBtn.onclick = async () => {
+    try { await save(); await render(); alert('Saved!'); }
+    catch (e) { alert(e.message || 'Failed to save review'); }
   };
 
   // Delete my own review (from form area)
