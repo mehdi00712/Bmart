@@ -1,18 +1,16 @@
-// reviews.js — with inline per-review Delete button for admin/seller/reviewer
+// reviews.js — inline Delete + Admin-only Ban button
 import {
   db, ensureAuth, doc, getDoc, collection, addDoc, updateDoc, deleteDoc,
   query, where, orderBy, getDocs, serverTimestamp
 } from './firebase.js';
 import { $ } from './util.js';
 
-// 👉 Put your admin UID here so we can show the delete button for you on-page.
-const SUPER_ADMIN_UID = "REPLACE_WITH_YOUR_UID";
+const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2"; // 👈 your admin UID
 
 export async function initReviews(productId) {
   const container = $('#reviews');
   if (!container) return;
 
-  // Base layout
   container.innerHTML = `
     <div class="card" style="padding:12px">
       <h2>Reviews</h2>
@@ -55,18 +53,15 @@ export async function initReviews(productId) {
   const commentEl = $('#comment', container);
   const noteEl = $('#reviewNote', container);
 
-  // Load product (to know owner for moderation)
   const prodSnap = await getDoc(doc(db, 'products', productId));
   const product = prodSnap.exists() ? prodSnap.data() : null;
-
-  // Signed-in user (anon ok)
   const user = await ensureAuth();
 
   function esc(s=''){ return String(s).replace(/[<>&]/g, m=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[m])); }
   function starText(n){ n = Number(n||0); return '★★★★★'.slice(0,n).padEnd(5,'☆'); }
-  const canModerateAny = (user?.uid === SUPER_ADMIN_UID) || (user?.uid && product && user.uid === product.ownerUid);
+  const isAdmin = user?.uid === SUPER_ADMIN_UID;
+  const canModerateAny = isAdmin || (user?.uid && product && user.uid === product.ownerUid);
 
-  // Fetch helpers
   async function fetchAllReviews() {
     const qAll = query(collection(db, 'products', productId, 'reviews'), orderBy('createdAt', 'desc'));
     const snap = await getDocs(qAll);
@@ -78,19 +73,17 @@ export async function initReviews(productId) {
     if (snap.empty) return null;
     const d = snap.docs[0];
     return { id: d.id, ref: d.ref, ...d.data() };
-    }
+  }
 
   async function render() {
     const [all, mine] = await Promise.all([fetchAllReviews(), fetchMyReview()]);
 
-    // Average
     const sum = all.reduce((s, r) => s + Number(r.stars || 0), 0);
     const avg = all.length ? (sum / all.length) : 0;
     avgRow.innerHTML = all.length
       ? `Average: <b>${avg.toFixed(1)}</b> (${all.length} review${all.length>1?'s':''})`
       : `No reviews yet`;
 
-    // Your review form state
     if (mine) {
       starsEl.value = String(mine.stars || 5);
       nameEl.value = mine.buyerName || '';
@@ -105,7 +98,6 @@ export async function initReviews(productId) {
       noteEl.textContent = `Only real buyers can fairly review. Please keep it respectful.`;
     }
 
-    // Seller cannot review own product (UI guard; rules enforce too)
     if (product && product.ownerUid === user.uid) {
       saveBtn.disabled = true;
       noteEl.textContent = 'Sellers cannot review their own products.';
@@ -113,30 +105,55 @@ export async function initReviews(productId) {
       saveBtn.disabled = false;
     }
 
-    // List with inline Delete button (admin/seller/reviewer)
     reviewsList.innerHTML = all.map(r => {
       const when = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleString() : '';
       const isReviewer = user?.uid === r.buyerUid;
       const canDeleteThis = canModerateAny || isReviewer;
+      const showBan = isAdmin && r.buyerUid; // admin-only ban
       return `
-        <div class="row" style="align-items:flex-start">
+        <div class="row" style="align-items:flex-start;gap:12px">
           <div style="min-width:80px">${starText(r.stars)}</div>
           <div style="flex:1">
             <b>${esc(r.buyerName || r.buyerUid?.slice(-6) || 'Anonymous')}</b>
             <span style="color:#9ca3af">${when}</span><br>
             <div>${esc(r.comment || '')}</div>
           </div>
-          ${canDeleteThis
-            ? `<div><button class="rev-del" data-path="${r.ref.path}" style="background:#ef4444">Delete</button></div>`
-            : `<div></div>`}
+          <div style="display:flex;gap:8px">
+            ${showBan ? `
+              <button class="rev-ban" data-uid="${esc(r.buyerUid)}"
+                title="Ban this user"
+                style="background:#6b7280;border:none;color:white;padding:6px 10px;border-radius:6px;cursor:pointer">
+                Ban
+              </button>` : ``}
+            ${canDeleteThis ? `
+              <button class="rev-del" data-path="${r.ref.path}"
+                style="background:#ef4444;border:none;color:white;padding:6px 10px;border-radius:6px;cursor:pointer">
+                Delete
+              </button>` : ``}
+          </div>
         </div>
       `;
     }).join('');
 
-    // Attach inline delete handlers
+    // Ban handler (admin only)
+    reviewsList.querySelectorAll('.rev-ban').forEach(btn => {
+      btn.onclick = async () => {
+        const targetUid = btn.dataset.uid;
+        if (!targetUid) return;
+        if (!confirm(`Ban this user? They will no longer be able to post.\nUID: ${targetUid}`)) return;
+        try {
+          await updateDoc(doc(db, 'users', targetUid), { role: 'banned' });
+          alert('User banned. They can no longer post reviews or products.');
+        } catch (e) {
+          alert(e.message || 'Failed to ban');
+        }
+      };
+    });
+
+    // Delete handler
     reviewsList.querySelectorAll('.rev-del').forEach(btn => {
       btn.onclick = async () => {
-        const path = btn.dataset.path; // products/{productId}/reviews/{reviewId}
+        const path = btn.dataset.path;
         if (!confirm('Delete this review?')) return;
         try {
           await deleteDoc(doc(db, path));
@@ -148,7 +165,6 @@ export async function initReviews(productId) {
     });
   }
 
-  // Save (create or update)
   saveBtn.onclick = async () => {
     try {
       const stars = Number(starsEl.value || 5);
@@ -157,9 +173,7 @@ export async function initReviews(productId) {
 
       const mine = await fetchMyReview();
       if (mine) {
-        await updateDoc(mine.ref, {
-          buyerUid: user.uid, buyerName, stars, comment, createdAt: serverTimestamp()
-        });
+        await updateDoc(mine.ref, { buyerUid: user.uid, buyerName, stars, comment, createdAt: serverTimestamp() });
       } else {
         await addDoc(collection(db, 'products', productId, 'reviews'), {
           buyerUid: user.uid, buyerName, stars, comment, createdAt: serverTimestamp()
@@ -172,7 +186,6 @@ export async function initReviews(productId) {
     }
   };
 
-  // Delete my own review from the form area
   delBtn.onclick = async () => {
     if (!confirm('Delete your review?')) return;
     try {
