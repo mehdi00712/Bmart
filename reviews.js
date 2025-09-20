@@ -5,7 +5,7 @@ import {
 } from './firebase.js';
 import { $ } from './util.js';
 
-const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2"; // 👈 your admin UID
+const SUPER_ADMIN_UID = "Je9nLjh9rzYNrf79ll6M6sfgN5I2ID"; // 👈 your admin UID
 
 export async function initReviews(productId) {
   const container = $('#reviews');
@@ -135,7 +135,7 @@ export async function initReviews(productId) {
       `;
     }).join('');
 
-    // Ban handler (admin only)
+    // Ban (admin-only)
     reviewsList.querySelectorAll('.rev-ban').forEach(btn => {
       btn.onclick = async () => {
         const targetUid = btn.dataset.uid;
@@ -150,7 +150,7 @@ export async function initReviews(productId) {
       };
     });
 
-    // Delete handler
+    // Delete (admin/seller/reviewer)
     reviewsList.querySelectorAll('.rev-del').forEach(btn => {
       btn.onclick = async () => {
         const path = btn.dataset.path;
@@ -165,6 +165,7 @@ export async function initReviews(productId) {
     });
   }
 
+  // Save (create or update my review)
   saveBtn.onclick = async () => {
     try {
       const stars = Number(starsEl.value || 5);
@@ -186,6 +187,7 @@ export async function initReviews(productId) {
     }
   };
 
+  // Delete my own review (from form area)
   delBtn.onclick = async () => {
     if (!confirm('Delete your review?')) return;
     try {
