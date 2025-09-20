@@ -1,42 +1,76 @@
-<!-- bottom of product.html  -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bmart — Product</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="nav">
+  <div class="logo"><a href="index.html" style="color:white;text-decoration:none">Bmart</a></div>
+  <nav style="display:flex;gap:12px;align-items:center">
+    <a href="index.html">Home</a>
+    <a href="cart.html">Cart</a>
+    <a href="checkout.html">Checkout</a>
+    <a href="login.html">Seller Login</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="admin.html">Admin</a>
+  </nav>
+</header>
+
+<main class="container" id="app">
+  <!-- content injected by script -->
+</main>
+
 <script type="module">
   import { db, doc, getDoc } from './firebase.js';
   import { addToCart } from './store.js';
   import { fmtCurrency, readQuery } from './util.js';
-  import { initReviews } from './reviews.js';  <!-- 👈 ensure this line exists -->
+  import { initReviews } from './reviews.js';
 
   const id = readQuery('id');
   const app = document.getElementById('app');
 
   async function render() {
+    if (!id) { app.innerHTML = '<p>Missing product id.</p>'; return; }
+
     const snap = await getDoc(doc(db, 'products', id));
-    if (!snap.exists()) { app.innerHTML = '<p>Not found.</p>'; return; }
+    if (!snap.exists()) { app.innerHTML = '<p>Product not found.</p>'; return; }
     const p = snap.data();
-    const img0 = (p.images && p.images[0]) || 'https://via.placeholder.com/600x400?text=Product';
+
+    const img0 = (p.images && p.images[0]) || 'https://via.placeholder.com/800x600?text=Product';
 
     app.innerHTML = `
       <div class="product">
-        <img src="${img0}" alt="${p.title}"/>
+        <img src="${img0}" alt="${p.title}">
         <div>
-          <h1>${p.title}</h1>
-          <p class="price">${fmtCurrency(p.price)}</p>
+          <h1>${p.title || 'Untitled product'}</h1>
+          <p class="price">${fmtCurrency(Number(p.price || 0))}</p>
           ${p.category ? `<div style="color:#9ca3af;margin-bottom:6px">${p.category}</div>` : ''}
-          <p>${p.description || ''}</p>
-          <label>Qty <input type="number" id="qty" min="1" value="1"></label>
-          <button id="add">Add to Cart</button>
+          <p>${(p.description || '').toString().replace(/</g,'&lt;')}</p>
+
+          <label>Qty
+            <input type="number" id="qty" min="1" value="1" style="max-width:100px">
+          </label>
+
+          <div class="row" style="border:none;padding:0;gap:8px;margin-top:8px">
+            <button id="add">Add to Cart</button>
+            <a href="index.html" class="btn" style="text-decoration:none">Continue Shopping</a>
+          </div>
         </div>
       </div>
 
-      <!-- Reviews -->
+      <!-- Reviews block -->
       <section id="reviews" style="margin-top:24px"></section>
     `;
 
     document.getElementById('add').onclick = () => {
-      const qty = Number(document.getElementById('qty').value || '1');
+      const qty = Math.max(1, Number(document.getElementById('qty').value || '1'));
       addToCart({
         productId: id,
-        title: p.title,
-        price: Number(p.price||0),
+        title: p.title || 'Product',
+        price: Number(p.price || 0),
         qty,
         sellerUid: p.ownerUid,
         shopId: p.shopId
@@ -44,8 +78,11 @@
       alert('Added to cart');
     };
 
-    // Initialize the reviews block
+    // Initialize inline reviews (Delete for seller/admin/reviewer; Ban for admin)
     await initReviews(id);
   }
+
   render();
 </script>
+</body>
+</html>
