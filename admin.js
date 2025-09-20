@@ -1,61 +1,70 @@
-// admin.js
 import { app, db } from './firebase.js';
-import { getDocs, collection, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-functions.js";
+import {
+  getFunctions, httpsCallable
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-functions.js";
+import {
+  collection, getDocs, query, where, orderBy, limit, startAfter,
+  doc, updateDoc, deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
-const usersDiv = document.getElementById('users');
+const functions = getFunctions(app, "us-central1"); // ✅ region must match
+const cfDeleteUserEverything = httpsCallable(functions, 'deleteUserEverything');
 
-// Make sure region matches your function (us-central1 by default)
-const functions = getFunctions(app, "us-central1");
-const deleteUserEverything = httpsCallable(functions, 'deleteUserEverything');
-
-async function loadUsers() {
-  const snap = await getDocs(collection(db, 'users'));
-  const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-                         .sort((a,b)=> (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
-
-  usersDiv.innerHTML = items.map(u => `
-    <div class="row">
-      <div style="flex:2;word-break:break-all">
-        <b>${u.displayName || u.email || u.id}</b><br>
-        <small>${u.id}</small>
-      </div>
-      <div style="flex:1">Role: <b>${u.role || 'buyer'}</b></div>
-      <div style="flex:2;display:flex;gap:8px;justify-content:flex-end">
-        <button data-id="${u.id}" data-role="seller">Make Seller</button>
-        <button data-id="${u.id}" data-role="admin">Make Admin</button>
-        <button class="danger" data-del="${u.id}" style="background:#ef4444">Delete User (all data)</button>
-      </div>
-    </div>
-  `).join('');
-
-  // role change
-  usersDiv.querySelectorAll('button[data-role]').forEach(b => {
-    b.onclick = async () => {
-      await updateDoc(doc(db, 'users', b.dataset.id), { role: b.dataset.role });
-      alert('Updated');
-      loadUsers();
-    };
-  });
-
-  // delete user (auto after OK)
-  usersDiv.querySelectorAll('button[data-del]').forEach(b => {
-    b.onclick = async () => {
-      const targetUid = b.dataset.del;
-      if (!confirm(`Delete this user and ALL their products & orders?\nUID: ${targetUid}`)) return;
-      try {
-        const res = await deleteUserEverything({ targetUid });
-        if (res?.data?.ok) {
-          alert('User and data deleted.');
-          loadUsers();
-        } else {
-          alert('Delete failed.');
-        }
-      } catch (e) {
-        alert(e?.message || 'internal');
-      }
-    };
-  });
+// simple paginator delete (client-side fallback)
+async function deleteQueryBatched(colName, field, value, batchSize = 100) {
+  let last = null;
+  for (;;) {
+    let qy = query(
+      collection(db, colName),
+      where(field, '==', value),
+      orderBy('__name__'),
+      limit(batchSize)
+    );
+    if (last) qy = query(qy, startAfter(last));
+    const snap = await getDocs(qy);
+    if (snap.empty) break;
+    for (const d of snap.docs) await deleteDoc(d.ref);
+    last = snap.docs[snap.docs.length - 1];
+    if (snap.size < batchSize) break;
+  }
 }
 
-loadUsers();
+async function wipeContentFallback(uid) {
+  await deleteQueryBatched('products', 'ownerUid', uid);
+  await deleteQueryBatched('orders', 'sellerUid', uid);
+  await deleteQueryBatched('orders', 'buyerUid', uid);
+}
+
+async function handleDelete(uid) {
+  if (!confirm(`Delete this user and ALL their data?\nUID: ${uid}`)) return;
+  try {
+    const res = await cfDeleteUserEverything({ targetUid: uid });
+    const data = res?.data || {};
+    if (data.ok) {
+      if (data.deletedAuth === false) {
+        alert(data.message || "Content deleted, but could not remove Auth account (you can disable/delete it in Firebase Authentication).");
+      } else {
+        alert("User and all data deleted.");
+      }
+      location.reload();
+      return;
+    }
+    // Not ok — show server reason and do a fallback wipe so they’re still removed from the site
+    alert((data.code || "internal") + ": " + (data.message || "Server error. Doing local wipe…"));
+    await wipeContentFallback(uid);
+    alert("Local wipe completed (products & orders removed).");
+    location.reload();
+  } catch (e) {
+    // Network/SDK error — fallback
+    alert("internal: " + (e?.message || "Function error. Doing local wipe…"));
+    await wipeContentFallback(uid);
+    alert("Local wipe completed (products & orders removed).");
+    location.reload();
+  }
+}
+
+// attach to buttons
+document.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('[data-del]');
+  if (btn) handleDelete(btn.dataset.del);
+});
