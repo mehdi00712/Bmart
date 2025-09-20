@@ -29,20 +29,15 @@ export const db = getFirestore(app);
 // --- Auth helpers ---
 /** Ensures there is a signed-in user (anonymous is fine). Resolves with the user. */
 export async function ensureAuth() {
-  // Fast path if already signed in
   if (auth.currentUser) return auth.currentUser;
-
-  // Wait for current state, otherwise sign in anonymously
   return new Promise(async (resolve) => {
-    let unsub = onAuthStateChanged(auth, async (u) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
       if (u) { unsub && unsub(); resolve(u); }
     });
-    // If nobody arrives in first tick, start anonymous
-    await signInAnonymously(auth).catch(() => {});
+    try { await signInAnonymously(auth); } catch (_) {}
   });
 }
 
-/** Optional sign-out export (used by dashboard etc.) */
 export { signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword };
 
 // --- Firestore: ensure users/{uid} exists with role: "buyer" ---
