@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
 <header class="nav">
   <div class="logo"><a href="index.html" style="color:white;text-decoration:none">Bmart — Seller</a></div>
   <nav style="display:flex;gap:12px;align-items:center">
@@ -28,7 +27,25 @@
       <label>Title <input required name="title"></label>
       <label>Price <input required name="price" type="number" step="0.01"></label>
       <label>Stock <input required name="stock" type="number"></label>
-      <label>Category <input name="category"></label>
+
+      <!-- Category with dropdown + free typing (datalist) -->
+      <label>Category
+        <input name="category" list="category-list" placeholder="Select or type…" />
+        <datalist id="category-list">
+          <!-- Suggest common categories (edit as you like) -->
+          <option value="groceries"></option>
+          <option value="fruits"></option>
+          <option value="vegetables"></option>
+          <option value="beverages"></option>
+          <option value="snacks"></option>
+          <option value="electronics"></option>
+          <option value="fashion"></option>
+          <option value="beauty"></option>
+          <option value="home"></option>
+          <option value="toys"></option>
+        </datalist>
+      </label>
+
       <label>Description <textarea name="description"></textarea></label>
       <label>Image <input type="file" id="img"></label>
       <button type="submit">Save</button>
@@ -49,7 +66,6 @@
 <script type="module">
   import { auth } from './firebase.js';
   import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-
   document.getElementById('signout').onclick = async (e) => {
     e.preventDefault();
     await signOut(auth);
